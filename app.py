@@ -7,6 +7,11 @@ Two pages:
   Benchmark — the differentiator: BM25 vs Vector vs Hybrid on a labelled query
               set, showing hit-rate and MRR side by side.
 
+The sidebar carries the controls that make the pipeline legible: which retriever
+to use, how many chunks reach the LLM, whether to search code / docs / tests, and
+— once more than one repo is indexed — which repo to scope to. It also shows what
+analyze.py detected about each codebase, so it's clear what you're querying.
+
 The "Retrieved files" panel is deliberately prominent. A RAG demo that only shows
 the final answer asks you to take retrieval on faith; showing the per-stage scores
 makes it possible to see *why* an answer came out the way it did — and to catch it
@@ -16,9 +21,9 @@ Run with:
     streamlit run app.py
 """
 
+import analyze
 import config
 import rag
-import retrieve
 
 import streamlit as st
 
@@ -44,6 +49,21 @@ METHODS = {
 @st.cache_data(show_spinner=False)
 def cached_stats():
     return rag.index_stats()
+
+
+@st.cache_data(show_spinner=False)
+def cached_analysis(repo_name):
+    """
+    Detected facts about a repo, or None if its working tree isn't on disk.
+
+    Analysis reads the cloned files, not the index, so it degrades quietly when
+    someone ships the indexes without repos/ (which is gitignored).
+    """
+    try:
+        info = analyze.analyze(repo_name)
+    except Exception:
+        return None
+    return {**info, "summary": analyze.summary_line(info), "root": str(info["root"])}
 
 
 def fmt(value, places=3):
@@ -103,6 +123,17 @@ with st.sidebar:
 
     total, repos, languages, kinds_count = cached_stats()
 
+    # Only worth showing once more than one repo has been ingested.
+    repo = None
+    if len(repos) > 1:
+        choice = st.selectbox(
+            "Repository",
+            ["🌐 All repositories"] + sorted(repos),
+            help="Scope retrieval to a single repo. Chunk metadata carries the repo "
+                 "name, so this filters both retrievers.",
+        )
+        repo = None if choice.startswith("🌐") else choice
+
     selected_kinds = st.multiselect(
         "Search in",
         list(config.CHUNK_KINDS),
@@ -123,6 +154,29 @@ with st.sidebar:
         ))
         top_langs = sorted(languages.items(), key=lambda kv: -kv[1])[:5]
         st.caption(" · ".join(f"{lang} {count}" for lang, count in top_langs))
+
+        # What is this codebase, actually? Detected from dependency manifests
+        # and file signatures rather than asked for.
+        for name in sorted(repos):
+            if repo and name != repo:
+                continue
+            info = cached_analysis(name)
+            if not info:
+                continue
+            with st.expander(f"🔎 About `{name}`"):
+                st.markdown(f"_{info['summary']}_")
+                for label, values in (
+                    ("Frameworks", info["frameworks"]),
+                    ("Databases", info["databases"]),
+                    ("Testing", info["testing"]),
+                    ("Infra", info["signals"]),
+                ):
+                    if values:
+                        st.markdown(f"**{label}** · {', '.join(values)}")
+                st.caption(
+                    f"{info['files']} indexable files · {info['size_mb']:.1f} MB · "
+                    f"{info['dependency_count']} declared dependencies"
+                )
     else:
         st.error("No index found. Run `python ingest.py` first.")
 
@@ -170,7 +224,8 @@ if page == "💬 Chat":
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
         with st.spinner(f"Retrieving with {method_label.split(' (')[0]}…"):
-            text, sources = rag.answer(question, k=top_k, method=method, kinds=kinds)
+            text, sources = rag.answer(question, repo=repo, k=top_k,
+                                       method=method, kinds=kinds)
         st.session_state.messages.append(
             {"role": "assistant", "content": text, "sources": sources}
         )
@@ -187,6 +242,12 @@ else:
     st.caption(
         "Every query below is labelled with the file that *should* be retrieved. "
         "Each one runs three ways and is scored on whether that file shows up."
+    )
+
+    st.info(
+        f"The query set is hand-labelled against **`{benchmark.BENCHMARK_REPO}`**, so the "
+        "benchmark always scopes retrieval to that repo — otherwise the numbers would drift "
+        "as unrelated repos are added to the index."
     )
 
     queries = benchmark.QUERIES

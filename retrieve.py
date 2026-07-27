@@ -71,11 +71,18 @@ def rrf(rankings, k=None):
 _store = None  # {"chunks": {chunk_id: record}, "indexes": [bm25 payloads]}
 
 
-def get_store(repo=None):
-    """Load the pickled BM25 indexes and their chunk records once, then reuse."""
+def get_store():
+    """
+    Load every pickled BM25 index and its chunk records once, then reuse.
+
+    Deliberately loads *all* repos rather than a requested one: the cache is a
+    module global, so keying it to whichever repo happened to be asked for first
+    would make every other repo silently invisible for the rest of the process.
+    Per-repo filtering happens at query time instead, where it's cheap.
+    """
     global _store
     if _store is None:
-        payloads = ingest.load_bm25(repo)
+        payloads = ingest.load_bm25()
         if not payloads:
             raise RuntimeError(
                 "No BM25 index found in bm25_index/. Run:  python ingest.py"
@@ -86,6 +93,14 @@ def get_store(repo=None):
                 chunks[record["chunk_id"]] = record
         _store = {"chunks": chunks, "indexes": payloads}
     return _store
+
+
+def available_repos():
+    """Names of every ingested repo, for the UI's repo selector."""
+    try:
+        return sorted(p["repo"] for p in get_store()["indexes"])
+    except Exception:
+        return []
 
 
 def get_chunk(chunk_id):
@@ -115,7 +130,7 @@ def bm25_search(query, k=None, repo=None, kinds=None):
         return []
 
     results = []
-    for payload in get_store(repo)["indexes"]:
+    for payload in get_store()["indexes"]:
         if repo and payload["repo"] != repo:
             continue
         scores = payload["bm25"].get_scores(tokens)

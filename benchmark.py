@@ -62,6 +62,10 @@ import argparse
 import config
 import retrieve
 
+# The labelled query set below is hand-written against this specific repo.
+# Pointing it at anything else measures nothing — the expected paths won't exist.
+BENCHMARK_REPO = "fastapi-users"
+
 METHODS = ["bm25", "vector", "rrf", "hybrid"]
 
 METHOD_LABELS = {
@@ -158,6 +162,12 @@ def run(k=None, repo=None, methods=None, strict=False, on_progress=None):
     k = config.FINAL_TOP_K if k is None else k
     methods = methods or METHODS
     kinds = ("source",) if strict else None
+
+    # Scope to the labelled repo by default. Without this, ingesting an unrelated
+    # repo silently changes these numbers — its chunks compete for the same top-k
+    # slots — and a benchmark whose result depends on what else happens to be in
+    # the index isn't measuring the retriever.
+    repo = repo or BENCHMARK_REPO
 
     total_steps = len(QUERIES) * len(methods)
     done = 0

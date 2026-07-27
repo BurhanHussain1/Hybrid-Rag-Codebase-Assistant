@@ -18,8 +18,9 @@ Usage:
     python ingest.py                                  # the default demo repo
     python ingest.py https://github.com/owner/name    # clone and ingest a repo
     python ingest.py C:\\path\\to\\local\\project       # ingest a local folder
+    python ingest.py <url-a> <url-b> <path-c>         # several repos in one run
     python ingest.py --chunks-only                    # chunk + report, build no indexes
-    python ingest.py --reset                          # wipe this repo's chunks first
+    python ingest.py --reset                          # wipe these repos' chunks first
 """
 
 import sys
@@ -425,7 +426,6 @@ def build_indexes(chunks, repo, reset=False):
     print(f"\nBuilding indexes for '{repo}' ({len(chunks)} chunks)...", flush=True)
     build_vector_index(chunks, repo, reset=reset)
     build_bm25_index(chunks, repo)
-    print("\nDone. Both indexes are ready — try:  python retrieve.py \"how does authentication work\"")
 
 
 def main():
@@ -433,17 +433,39 @@ def main():
 
     args = sys.argv[1:]
     flags = {a for a in args if a.startswith("--")}
-    positional = [a for a in args if not a.startswith("--")]
-    source = positional[0] if positional else None
+    sources = [a for a in args if not a.startswith("--")] or [config.DEFAULT_REPO_URL]
 
-    chunks, repo, stats = collect_chunks(source)
-    print_report(repo, stats, chunks)
+    # Each repo is ingested independently: its own chunk ids, its own BM25
+    # corpus, its own metadata tag. A failure on one doesn't touch the others,
+    # and re-running with a new URL adds to the index rather than replacing it.
+    ingested, failed = [], []
+    for n, source in enumerate(sources, 1):
+        if len(sources) > 1:
+            print(f"\n{'#' * 68}\n# [{n}/{len(sources)}] {source}\n{'#' * 68}", flush=True)
+        try:
+            chunks, repo, stats = collect_chunks(source)
+        except Exception as e:
+            print(f"FAILED to ingest {source}: {type(e).__name__}: {e}", flush=True)
+            failed.append(source)
+            continue
 
-    if "--chunks-only" in flags:
-        print("\n--chunks-only: stopping before index build.")
-        return
+        print_report(repo, stats, chunks)
 
-    build_indexes(chunks, repo, reset="--reset" in flags)
+        if "--chunks-only" in flags:
+            print("\n--chunks-only: stopping before index build.")
+            continue
+
+        build_indexes(chunks, repo, reset="--reset" in flags)
+        ingested.append((repo, len(chunks)))
+
+    if ingested:
+        total = sum(n for _, n in ingested)
+        names = ", ".join(f"{repo} ({n})" for repo, n in ingested)
+        print(f"\nIndexed {total} chunks across {len(ingested)} repo(s): {names}")
+        print('Try:  python retrieve.py "how does authentication work"')
+    if failed:
+        print(f"\n{len(failed)} source(s) failed: {', '.join(failed)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

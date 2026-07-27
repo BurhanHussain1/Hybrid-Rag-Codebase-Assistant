@@ -128,7 +128,55 @@ python benchmark.py --mode strict --k 3              # harder: source only, top 
 | `rag.py` | retrieve → OpenAI → cited answer |
 | `app.py` | Streamlit chat UI + benchmark page |
 | `benchmark.py` | BM25 vs Vector vs Hybrid comparison, labelled query set |
+| `analyze.py` | detects languages, frameworks, databases, tooling from a repo |
+| `eval.py` | end-to-end eval: retrieval + citation + groundedness |
 | `download_model.py` | resumable reranker download (the Hub client won't resume) |
+
+## End-to-end evaluation
+
+`benchmark.py` scores retrieval. `eval.py` scores the whole pipeline, including what the
+model does with what it retrieved:
+
+```bash
+python eval.py                    # retrieval + citation + groundedness
+python eval.py --retrieval-only   # no API calls, no cost
+python eval.py -v                 # show any identifier not found in context
+```
+
+Current results on 8 implementation questions (`gpt-4o-mini`, hybrid, k=6, source-only):
+
+| Metric | Score | What it checks |
+| --- | --- | --- |
+| Retrieval | 88% | the file that answers the question reached the context |
+| Citation | 75% | that file is actually cited — 8/8 answers cite something, 8/8 markers valid |
+| Groundedness | 100% | every `backticked` identifier appears in the retrieved context |
+| Content | 75% | the answer mentions the expected key terms |
+
+Groundedness is the cheap hallucination detector: across 113 identifiers named in the eight
+answers, every one was present in the retrieved code. It catches fabricated API names, not
+misinterpretation of real ones — an answer can cite real symbols and still describe them
+wrongly, so treat it as a floor, not a guarantee.
+
+## Multiple repositories
+
+```bash
+python ingest.py https://github.com/fastapi-users/fastapi-users https://github.com/psf/requests
+python analyze.py requests          # what is this codebase?
+python retrieve.py --repo requests "how are redirects handled?"
+```
+
+Each repo gets its own BM25 corpus (scores are corpus-relative and can't be concatenated)
+and its own metadata tag. The Streamlit sidebar grows a repository selector once more than
+one is indexed.
+
+`benchmark.py` always scopes to `fastapi-users`, the repo its labels were written against.
+That's deliberate: adding a second repo unscoped moved strict hit-rate for BM25 from 65% →
+59% purely because unrelated chunks compete for the same top-6 slots. A benchmark whose
+result depends on what else happens to be in the index isn't measuring the retriever.
+
+That interference is itself a useful result — under cross-repo noise, **hybrid held at 82%
+and 100% on identifiers while BM25 lost 6 points and RRF-without-rerank lost 12**. The
+reranker is what absorbs the extra noise.
 
 ## Notes on the design
 
