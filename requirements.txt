@@ -1,0 +1,8 @@
+openai
+chromadb
+rank-bm25
+sentence-transformers
+langchain-text-splitters
+gitpython
+streamlit
+python-dotenv

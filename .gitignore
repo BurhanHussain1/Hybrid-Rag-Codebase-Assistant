@@ -1,0 +1,43 @@
+# ---- Secrets / environment ----
+.env
+.env.*
+!.env.example
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ---- Virtual environments ----
+venv/
+.venv/
+env/
+ENV/
+
+# ---- Generated data (regenerate with the scripts, don't commit) ----
+# NOTE: git only treats '#' as a comment at the START of a line. A trailing
+# comment becomes part of the pattern and silently matches nothing.
+# cloned repositories   -> python ingest.py
+repos/
+# vector index          -> python ingest.py
+chroma_db/
+# pickled BM25 index    -> python ingest.py
+bm25_index/
+# downloaded reranker   -> python download_model.py
+models/
+*.sqlite3
+
+# ---- Node (only if a cloned demo repo leaks out of repos/) ----
+node_modules/
+.next/
+
+# ---- OS / editors ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+.gstack/
