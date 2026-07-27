@@ -10,6 +10,12 @@ project runs **both**, fuses the two rankings with **Reciprocal Rank Fusion**, r
 shortlist with a **cross-encoder**, and ships a benchmark page that proves the combination
 beats either retriever alone.
 
+![Chat UI answering "How does authentication work?" with inline citations, above a table showing each retrieved chunk's BM25, vector, RRF and cross-encoder scores](assets/screenshot-chat.png)
+
+Look at the `bm25` column: rows 3, 4 and 5 show a dash. Keyword search never surfaced those
+chunks at all — the vector index found them, fusion kept them, and the reranker put two of
+them in the top four. That's the whole argument for hybrid retrieval, visible in one table.
+
 ```
                     ┌──────────────┐
   question ────────▶│  BM25 (top20)│──┐
