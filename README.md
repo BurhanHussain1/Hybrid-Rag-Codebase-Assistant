@@ -92,9 +92,15 @@ Without a key the app still works in retrieval-only mode.
 
 ## Quickstart
 
+Requires Python 3.11+ (built and tested on 3.13.5).
+
 ```bash
 python -m venv venv
 venv\Scripts\activate            # Windows;  source venv/bin/activate on macOS/Linux
+
+# Linux only — see the note below. Skip this line on Windows and macOS.
+pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
+
 pip install -r requirements.txt
 
 copy .env.example .env           # then paste your OpenAI key into .env
@@ -104,8 +110,36 @@ python ingest.py https://github.com/fastapi-users/fastapi-users
 streamlit run app.py
 ```
 
+**Why the extra torch line on Linux.** `sentence-transformers` depends on torch, and PyPI's
+default torch wheel for Linux is the CUDA build — about 2.5 GB, downloaded to run a 90 MB
+reranker that never touches a GPU. Installing the CPU wheel first gets you ~200 MB instead.
+Windows and macOS already default to CPU wheels, so the plain install is fine there.
+
+Versions in `requirements.txt` are pinned exactly. ChromaDB and `langchain-text-splitters`
+have both shipped breaking changes across minor releases, and an unpinned clone a year from
+now is a clone that doesn't run.
+
 `ingest.py` with no argument uses the default demo repo from `config.py`. Point it at a
 local folder instead of a URL to index a project you already have on disk.
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+43 tests, ~7 seconds, no network and no API key — they cover the pure logic that everything
+else rests on: BM25 tokenization, chunk metadata and line numbers, the RRF arithmetic, and
+the benchmark/eval scoring rules.
+
+The line-number tests get the most attention, because `start_line` is the one field that can
+be wrong without anything appearing broken — citations keep rendering, they just point at the
+wrong code. One test specifically covers duplicated code blocks, the case that forced line
+numbers to be derived from the splitter's offset rather than by searching for the chunk text.
+
+The suite was checked by mutation: introducing an off-by-one in `start_line`, shifting the RRF
+rank offset, and disabling camelCase splitting each turn it red.
 
 ## Command line
 
@@ -131,6 +165,7 @@ python benchmark.py --mode strict --k 3              # harder: source only, top 
 | `analyze.py` | detects languages, frameworks, databases, tooling from a repo |
 | `eval.py` | end-to-end eval: retrieval + citation + groundedness |
 | `download_model.py` | resumable reranker download (the Hub client won't resume) |
+| `tests/` | pytest suite — tokenization, chunk line numbers, RRF, scoring |
 
 ## End-to-end evaluation
 

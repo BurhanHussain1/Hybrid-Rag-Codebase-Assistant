@@ -1,8 +1,27 @@
-openai
-chromadb
-rank-bm25
-sentence-transformers
-langchain-text-splitters
-gitpython
-streamlit
-python-dotenv
+# Pinned to the versions this project was built and tested against
+# (Python 3.13.5, Windows 11). Exact pins because several of these move fast —
+# chromadb and langchain-text-splitters have both made breaking changes across
+# minor versions, and an unpinned clone six months from now may simply not run.
+#
+# ---------------------------------------------------------------------------
+# IMPORTANT — torch, on Linux only
+# ---------------------------------------------------------------------------
+# sentence-transformers pulls in torch. On Windows and macOS, plain
+# `pip install -r requirements.txt` gets the CPU build and you can ignore this.
+# On Linux, PyPI's default torch wheel is the CUDA build: ~2.5 GB downloaded to
+# run a 90 MB reranker entirely on CPU. Install the CPU wheel first instead:
+#
+#     pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
+#     pip install -r requirements.txt
+#
+# Nothing in this project uses a GPU.
+# ---------------------------------------------------------------------------
+
+openai==2.48.0
+chromadb==1.5.9
+rank-bm25==0.2.2
+sentence-transformers==5.6.1
+langchain-text-splitters==1.1.2
+GitPython==3.1.57
+streamlit==1.60.0
+python-dotenv==1.2.2
