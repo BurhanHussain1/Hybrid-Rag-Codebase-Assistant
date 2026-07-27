@@ -97,10 +97,6 @@ Requires Python 3.11+ (built and tested on 3.13.5).
 ```bash
 python -m venv venv
 venv\Scripts\activate            # Windows;  source venv/bin/activate on macOS/Linux
-
-# Linux only — see the note below. Skip this line on Windows and macOS.
-pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
-
 pip install -r requirements.txt
 
 copy .env.example .env           # then paste your OpenAI key into .env
@@ -109,11 +105,6 @@ python download_model.py         # fetch the reranker (resumable; ~90 MB, once)
 python ingest.py https://github.com/fastapi-users/fastapi-users
 streamlit run app.py
 ```
-
-**Why the extra torch line on Linux.** `sentence-transformers` depends on torch, and PyPI's
-default torch wheel for Linux is the CUDA build — about 2.5 GB, downloaded to run a 90 MB
-reranker that never touches a GPU. Installing the CPU wheel first gets you ~200 MB instead.
-Windows and macOS already default to CPU wheels, so the plain install is fine there.
 
 Versions in `requirements.txt` are pinned exactly. ChromaDB and `langchain-text-splitters`
 have both shipped breaking changes across minor releases, and an unpinned clone a year from
