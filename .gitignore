@@ -34,6 +34,9 @@ models/
 node_modules/
 .next/
 
+# ---- Local working notes (kept on disk, not published) ----
+IMPLEMENTATION_PLAN.md
+
 # ---- OS / editors ----
 .DS_Store
 Thumbs.db
